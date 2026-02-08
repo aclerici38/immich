@@ -678,6 +678,15 @@ export class QsvSwDecodeConfig extends BaseHWConfig {
 
   getBaseOutputOptions(target: TranscodeTarget, videoStream: VideoStreamInfo, audioStream?: AudioStreamInfo) {
     const options = super.getBaseOutputOptions(target, videoStream, audioStream);
+
+    options.push('-enc_time_base:v demux');
+
+    const qsvFrameRate =
+      this.getQsvFrameRate(videoStream.averageFrameRate) ?? this.getQsvFrameRate(videoStream.frameRate);
+    if (qsvFrameRate) {
+      options.push(`-qsv_params ${qsvFrameRate}`);
+    }
+
     // VP9 requires enabling low power mode https://git.ffmpeg.org/gitweb/ffmpeg.git/commit/33583803e107b6d532def0f9d949364b01b6ad5a
     if (this.config.targetVideoCodec === VideoCodec.Vp9) {
       options.push('-low_power 1');
@@ -737,6 +746,21 @@ export class QsvSwDecodeConfig extends BaseHWConfig {
 
   getScaling(videoStream: VideoStreamInfo): string {
     return super.getScaling(videoStream, 1);
+  }
+
+  private getQsvFrameRate(frameRate?: string): string | undefined {
+    if (!frameRate || frameRate === '0/0') {
+      return undefined;
+    }
+
+    const [numeratorRaw, denominatorRaw = '1'] = frameRate.split('/');
+    const numerator = Number.parseInt(numeratorRaw, 10);
+    const denominator = Number.parseInt(denominatorRaw, 10);
+    if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || numerator <= 0 || denominator <= 0) {
+      return undefined;
+    }
+
+    return `FrameRateExtN=${numerator}:FrameRateExtD=${denominator}`;
   }
 }
 
